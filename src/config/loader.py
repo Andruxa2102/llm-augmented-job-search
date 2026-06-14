@@ -1,21 +1,24 @@
-import logging, yaml
+from logging import getLogger
+from yaml import safe_load, YAMLError
+from pathlib import Path
+
 from pydantic import ValidationError
 from src.config.models import SourcesConfig
 
-logger = logging.getLogger(__name__)
+logger = getLogger(__name__)
 
 class ConfigLoadError(Exception):
     """Raised when configuration cannot be loaded or validated"""
     pass
 
-def load_sources_config(path: str) -> SourcesConfig:
+def load_sources_config(path: Path) -> SourcesConfig:
     try:
         with open(path, "r", encoding="utf-8") as f:
-            raw = yaml.safe_load(f)
+            raw = safe_load(f)
     except FileNotFoundError as e:
         logger.error(f"Config file not found: {path}")
         raise ConfigLoadError(f"File not found: {path}") from e
-    except yaml.YAMLError as e:
+    except YAMLError as e:
         line = e.problem_mark.line + 1 if e.problem_mark else "?"
         logger.error(f"Invalid YAML syntax at line {line}: {e.problem}")
         raise ConfigLoadError(f"Invalid YAML syntax: {e.problem}") from e

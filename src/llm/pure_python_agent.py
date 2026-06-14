@@ -1,7 +1,7 @@
 import json, logging, yaml
-from typing import Dict, Any
+from typing import Any
 import ollama
-from .agent_interface import LLMFilterAgent
+from src.llm.agent_interface import LLMFilterAgent
 
 logger = logging.getLogger(__name__)
 
@@ -9,7 +9,7 @@ class PurePythonFilterAgent(LLMFilterAgent):
     def __init__(self, cfg_path: str = "../config/llm.yaml"):
         with open(cfg_path) as f: self.cfg = yaml.safe_load(f)
 
-    def evaluate(self, vacancy: Dict[str, Any]) -> Dict[str, Any]:
+    def evaluate(self, vacancy: dict[str, Any]) -> dict[str, Any]:
         prompt = (f"Vacancy: {vacancy['title']}\nCompany: {vacancy['company']}\n"
                   f"Description: {vacancy['description']}\n\n"
                   f"Return ONLY JSON matching the schema. Is it suitable for Python/Data Engineering?")

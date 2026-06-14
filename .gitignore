@@ -60,3 +60,7 @@ tests/*
 
 # Ollama / Local Models
 ollama_models/
+
+# Other
+src/adapters/parsers
+saved_page/*

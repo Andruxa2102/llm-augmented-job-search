@@ -1,59 +1,80 @@
-import logging
-import json
-import os
-import sys
+from logging import getLogger, basicConfig, INFO, info, critical
+from json import dumps
+from os import getcwd
+from sys import exit
 from datetime import datetime, timezone
 from pathlib import Path
-from src.adapters.SourceX import SourceXAdapter
-from src.config.loader import load_sources_config, ConfigLoadError
+from dotenv import load_dotenv
 from src.llm.pure_python_agent import PurePythonFilterAgent
 from src.storage.db import SessionLocal, engine
 from src.storage.models import RawVacancy, FilteredVacancy, Base
 
-logging.basicConfig(level=logging.INFO, format="%(asctime)s | %(levelname)s | %(message)s")
-logger = logging.getLogger(__name__)
 
-logging.info(f"CWD: {os.getcwd()}")
-logging.info(f"__file__: {__file__}")
+env_path = Path(__file__).resolve().parent.parent / ".env"
+load_dotenv(dotenv_path=env_path)
+
+
+from src.config.loader import load_sources_config, ConfigLoadError
+from src.adapters.SourceX import SourceXAdapter
+
+
+basicConfig(level=INFO, format="%(asctime)s | %(levelname)s | %(message)s")
+logger = getLogger(__name__)
+
+info(f"CWD: {getcwd()}")
+info(f"__file__: {__file__}")
 
 def main():
     # 1. Initialization
+    config_path = Path(__file__).resolve().parent.parent / "config" / "sources.yaml"
+
     try:
-        sources = load_sources_config(Path(__file__).parent.parent / "config" / "sources.yaml")
+        config = load_sources_config(config_path)
     except ConfigLoadError as e:
-        logging.critical(f"Pipeline aborted: {e}")
-        sys.exit(1)
+        critical(f"Pipeline aborted: {e}")
+        exit(1)
+
     Base.metadata.create_all(engine)
-    sources_dict = sources.sources
-    adapter = SourceXAdapter(sources_dict["SourceX"])
-    llm = PurePythonFilterAgent()
 
-    # 2. Fetch & Normalize
-    raw = adapter.fetch_raw()
-    normalized = [adapter.normalize(r) for r in raw]
-    logger.info(f"Fetched {len(normalized)} items")
+    for source_name, source_cfg in config.sources.items():
+        if not source_cfg.enabled:
+            logger.info(f"Skipping disabled source: {source_name}")
+            continue
 
-    # 3. Idempotent Upsert Raw
-    with SessionLocal() as sess:
+        logger.info(f"Starting pipeline for: {source_name} (query: {source_cfg.query})")
+
+        adapter = SourceXAdapter(cfg = source_cfg)
+        llm = PurePythonFilterAgent()
+
+        # 2. Fetch & Normalize
+        raw_items = adapter.fetch_raw()
+        normalized = [adapter.normalize(r) for r in raw_items]
+        logger.info(f"Fetched {len(normalized)} items")
+
+        # 3. Idempotent Upsert Raw
+        with SessionLocal() as sess:
+            for item in normalized:
+                sess.merge(RawVacancy(**item))
+            sess.commit()
+
+        # 4. LLM Filter & Save
+        results = []
         for item in normalized:
-            sess.merge(RawVacancy(**item))
-        sess.commit()
-
-    # 4. LLM Filter & Save
-    results = []
-    for item in normalized:
-        llm_res = llm.evaluate(item)
-        results.append({
-            "id": item["id"], "source_id": item["id"],
-            "llm_pass": llm_res["pass"], "confidence": llm_res["confidence"],
-            "reason": llm_res["reason"], "tags": json.dumps(llm_res["tags"]),
-            "processed_at": datetime.now(timezone.utc)
-        })
-    with SessionLocal() as sess:
-        for r in results:
-            sess.merge(FilteredVacancy(**r))
-        sess.commit()
-    logger.info(f"Processed: {len(results)}. Passed: {sum(1 for r in results if r['llm_pass'])}")
+            llm_res = llm.evaluate(item)
+            results.append({
+                "id": item["id"],
+                "source_id": item["id"],
+                "llm_pass": llm_res["pass"],
+                "confidence": llm_res["confidence"],
+                "reason": llm_res["reason"],
+                "tags": dumps(llm_res["tags"]),
+                "processed_at": datetime.now(timezone.utc)
+            })
+        with SessionLocal() as sess:
+            for r in results:
+                sess.merge(FilteredVacancy(**r))
+            sess.commit()
+        logger.info(f"Processed: {len(results)}. Passed: {sum(1 for r in results if r['llm_pass'])}")
 
 if __name__ == "__main__":
     main()

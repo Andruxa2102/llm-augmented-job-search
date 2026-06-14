@@ -1,5 +1,4 @@
 from abc import ABC, abstractmethod
-from typing import List, Dict
 import hashlib
 from datetime import datetime, timezone
 
@@ -10,10 +9,10 @@ class JobSource(ABC):
         pass
 
     @abstractmethod
-    def fetch_raw(self) -> List[Dict]:
+    def fetch_raw(self) -> list[dict]:
         pass
 
-    def normalize(self, raw_item: Dict) -> Dict:
+    def normalize(self, raw_item: dict) -> dict:
         now = datetime.now(timezone.utc)
         raw_id = self._generate_id(raw_item)
         return {
@@ -28,6 +27,6 @@ class JobSource(ABC):
         }
 
     @staticmethod
-    def _generate_id(item: Dict) -> str:
+    def _generate_id(item: dict) -> str:
         payload = f"{item.get('title','')}|{item.get('company','')}|{item.get('url','')}"
         return hashlib.sha256(payload.encode()).hexdigest()[:16]

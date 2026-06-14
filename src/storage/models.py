@@ -1,7 +1,7 @@
 from sqlalchemy import String, Boolean, Float, DateTime, Text
 from sqlalchemy.orm import Mapped, mapped_column
-from datetime import datetime, timezone
-from .db import Base
+from datetime import datetime
+from src.storage.db import Base
 
 class RawVacancy(Base):
     __tablename__ = "raw_vacancies"

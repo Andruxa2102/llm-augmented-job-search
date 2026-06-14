@@ -1,12 +1,11 @@
 from fastapi import FastAPI, Depends
 from sqlalchemy.orm import Session
 from pydantic import BaseModel, ConfigDict
-from typing import List
 from datetime import datetime
-from src.storage.db import engine, SessionLocal
+from src.storage.db import SessionLocal
 from src.storage.models import FilteredVacancy
 
-app = FastAPI(title="LLM augmented work search", version="1.0.0")
+app = FastAPI(title="LLM augmented job search", version="1.0.0")
 
 def get_db():
     db = SessionLocal()
@@ -23,7 +22,7 @@ class VacancyOut(BaseModel):
     confidence: float
     processed_at: datetime
 
-@app.get("/api/v1/vacancies", response_model=List[VacancyOut])
+@app.get("/api/v1/vacancies", response_model=list[VacancyOut])
 def get_vacancies(db: Session = Depends(get_db)):
     return db.query(FilteredVacancy).filter(FilteredVacancy.llm_pass == True)\
         .order_by(FilteredVacancy.processed_at.desc()).limit(50).all()
