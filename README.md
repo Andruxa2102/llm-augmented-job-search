@@ -14,7 +14,6 @@ An automated ETL pipeline for extracting vacancy data, filtering it using an LLM
 - **Idempotency**:                  repeating launches do not create duplicates (UPSERT via `merge`);
 - **Graceful degradation**:         if LLM is inaccessible, the pipeline continues working with fallback logic;
 - **Security**:                     URL and headers are stored in the environment variables - not committed to Git;
-- **Ethics of data collection**:    used archive HTML-snapshots for demo - with respect for `robots.txt`;
 ```
 
 ## Architecture
