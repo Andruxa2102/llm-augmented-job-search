@@ -15,3 +15,4 @@ class LLMFilterAgent(ABC):
         Returns:
             {"pass": bool, "confidence": float, "reason": str, "tags": list[str]}"""
         pass
+    

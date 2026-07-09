@@ -5,6 +5,7 @@ from sys import exit
 from datetime import datetime, timezone
 from pathlib import Path
 from dotenv import load_dotenv
+from src.adapters.registry import get_adapter_class
 from src.llm.pure_python_agent import PurePythonFilterAgent
 from src.storage.db import SessionLocal, engine
 from src.storage.models import RawVacancy, FilteredVacancy, Base
@@ -15,7 +16,6 @@ load_dotenv(dotenv_path=env_path)
 
 
 from src.config.loader import load_sources_config, ConfigLoadError
-from src.adapters.SourceX import SourceXAdapter
 
 
 basicConfig(level=INFO, format="%(asctime)s | %(levelname)s | %(message)s")
@@ -43,7 +43,8 @@ def main():
 
         logger.info(f"Starting pipeline for: {source_name} (query: {source_cfg.query})")
 
-        adapter = SourceXAdapter(cfg = source_cfg)
+        adapter_class = get_adapter_class(source_name)
+        adapter = adapter_class(cfg=source_cfg)
         llm = PurePythonFilterAgent()
 
         # 2. Fetch & Normalize
@@ -90,7 +91,6 @@ def main():
                     existing.reason = r["reason"]
                     existing.tags = r["tags"]
                     existing.processed_at = r["processed_at"]
-                    existing.llm_pass = r["llm_pass"]
                 else:
                     sess.add(FilteredVacancy(**r))
             sess.commit()

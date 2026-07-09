@@ -16,7 +16,7 @@ class RawVacancy(Base):
     source: Mapped[str] = mapped_column(Text)
     title: Mapped[str] = mapped_column(Text)
     company: Mapped[str] = mapped_column(Text)
-    url: Mapped[str] = mapped_column(Text)
+    url: Mapped[str] = mapped_column(Text, nullable=True)
     description: Mapped[str] = mapped_column(Text)
     raw_data: Mapped[str] = mapped_column(Text)
     fetched_at: Mapped[datetime] = mapped_column(DateTime, default=lambda: datetime.now(timezone.utc))

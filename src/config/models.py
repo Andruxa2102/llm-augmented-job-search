@@ -1,5 +1,5 @@
 from os import getenv
-from pydantic import BaseModel, Field, field_validator, HttpUrl, ValidationInfo, ConfigDict
+from pydantic import BaseModel, Field, field_validator, HttpUrl, ValidationInfo, ConfigDict, DirectoryPath
 from dotenv import load_dotenv
 
 
@@ -7,8 +7,8 @@ class RateLimitConfig(BaseModel):
     """Controls how many requests can be made to the endpoint to prevent abuse and manage infrastructure costs"""
     model_config = ConfigDict(extra='forbid')
 
-    min_delay_s: float = Field(ge=0.5, description="Minimum delay between requests (seconds)")
-    max_delay_s: float = Field(ge=1.5, description="Maximum delay between requests (seconds)")
+    min_delay_s: float = Field(ge=0.1, description="Minimum delay between requests (seconds)")
+    max_delay_s: float = Field(ge=0.2, description="Maximum delay between requests (seconds)")
     max_requests: int = Field(default=5, description="Max requests per period")
     period_seconds: int = Field(default=2, description="Time window for max_requests")
 
@@ -36,7 +36,7 @@ class SourceConfig(BaseModel):
     """Configuration for single source in config/sources.yaml"""
     model_config = ConfigDict(extra='forbid')
 
-    base_url: HttpUrl
+    base_url: HttpUrl | DirectoryPath
     rate_limit: RateLimitConfig
     pagination: PaginationConfig = Field(default_factory=PaginationConfig)
     enabled: bool = True
