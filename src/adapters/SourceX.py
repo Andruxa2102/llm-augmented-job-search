@@ -27,17 +27,12 @@ class SourceXAdapter(JobSource):
         """Load headers from JSON file or return default headers"""
 
         default_headers = {
-        "User-Agent": "Mozilla/5.0 (compatible; JobResearchBot/1.0; +https://github.com/Andruxa2102/llm-augmented-work-search)",
-        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
-        "Accept-Language": "ru-RU,ru;q=0.9,en;q=0.5",
-        "Accept-Encoding": "gzip, deflate, br",
-        "Connection": "keep-alive",
-        "Sec-Fetch-Dest": "document",
-        "Sec-Fetch-Mode": "navigate",
-        "Sec-Fetch-Site": "same-origin",
-        "Sec-Fetch-User": "?1",
-        "Upgrade-Insecure-Requests": "1",
-        "Referer": "https://example.com/",
+            'User-Agent': 'Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:152.0) Gecko/20100101 Firefox/152.0',
+            'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8',
+            'Accept-Language': 'ru-RU,ru;q=0.9,en-US;q=0.8,en;q=0.7',
+            'Accept-Encoding': 'gzip, deflate, br',
+            'Referer': 'https://hh.ru',
+            'Connection': 'keep-alive'
     }
 
         if self.cfg.headers_file:
@@ -118,23 +113,7 @@ class SourceXAdapter(JobSource):
             page += 1
 
     def _fetch_page(self, page: int) -> str:
-
-        test_dir = self._project_root / "saved_page" / "2026-04-27"
-
-        if page == 1:
-            test_path = test_dir / "example.html"
-        else:
-            test_path = test_dir / f"example_{page}.html"
-
-        if test_path.exists():
-            logger.debug(f"Loading page {page} from local file: {test_path}")
-            return test_path.read_text(encoding="utf-8")
-        else:
-            return ""
-
-
-    def _fetch_page_httpx(self, page: int) -> str:
-        """Fetches single page HTML with proper headers and error handling"""
+        """Fetches single page HTML from Web"""
 
         if page == 1:
             params = {

@@ -54,27 +54,48 @@ def main():
         # 3. Idempotent Upsert Raw
         with SessionLocal() as sess:
             for item in normalized:
-                sess.merge(RawVacancy(**item))
+                existing = sess.query(RawVacancy).filter_by(source_id=item["source_id"]).first()
+                if existing:
+                    existing.title = item["title"]
+                    existing.company = item["company"]
+                    existing.url = item["url"]
+                    existing.description = item["description"]
+                    existing.raw_data = item["raw_data"]
+                    existing.fetched_at = datetime.now(timezone.utc)
+                else:
+                    sess.add(RawVacancy(**item))
+
             sess.commit()
 
         # 4. LLM Filter & Save
         results = []
         for item in normalized:
             llm_res = llm.evaluate(item)
+
             results.append({
-                "id": item["id"],
-                "source_id": item["id"],
-                "llm_pass": llm_res["pass"],
+                "source_id": item["source_id"],
+                "decision": llm_res["decision"],
                 "confidence": llm_res["confidence"],
                 "reason": llm_res["reason"],
                 "tags": dumps(llm_res["tags"]),
                 "processed_at": datetime.now(timezone.utc)
             })
+
         with SessionLocal() as sess:
             for r in results:
-                sess.merge(FilteredVacancy(**r))
+                existing = sess.query(FilteredVacancy).filter_by(source_id=r["source_id"]).first()
+                if existing:
+                    existing.decision = r["decision"]
+                    existing.confidence = r["confidence"]
+                    existing.reason = r["reason"]
+                    existing.tags = r["tags"]
+                    existing.processed_at = r["processed_at"]
+                    existing.llm_pass = r["llm_pass"]
+                else:
+                    sess.add(FilteredVacancy(**r))
             sess.commit()
-        logger.info(f"Processed: {len(results)}. Passed: {sum(1 for r in results if r['llm_pass'])}")
+
+        logger.info(f"[{source_name}] Processed: {len(results)}")
 
 if __name__ == "__main__":
     main()

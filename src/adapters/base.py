@@ -12,21 +12,20 @@ class JobSource(ABC):
     def fetch_raw(self) -> list[dict]:
         pass
 
-    def normalize(self, raw_item: dict) -> dict:
-        now = datetime.now(timezone.utc)
-        raw_id = self._generate_id(raw_item)
+    def normalize(self, item: dict) -> dict:
         return {
+            "source_id": self._generate_source_id(item),
             "source": self.source_name,
-            "id": raw_id,
-            "title": raw_item.get("title", "").strip(),
-            "company": raw_item.get("company", "Unknown").strip(),
-            "url": raw_item.get("url", "").strip(),
-            "description": raw_item.get("description", "").strip(),
-            "fetched_at": now,
-            "raw_data": str(raw_item)
+            "title": item.get("title", "").strip(),
+            "company": item.get("company", "").strip(),
+            "url": item.get("url", "").strip(),
+            "description": item.get("description", "").strip(),
+            "raw_data": str(item),
+            "fetched_at": datetime.now(timezone.utc),
         }
 
     @staticmethod
-    def _generate_id(item: dict) -> str:
-        payload = f"{item.get('title','')}|{item.get('company','')}|{item.get('url','')}"
-        return hashlib.sha256(payload.encode()).hexdigest()[:16]
+    def _generate_source_id(item: dict) -> str:
+        url = item.get("url", "").strip()
+        content = url if url else f"{item.get('title')}|{item.get('company')}"
+        return hashlib.md5(content.encode()).hexdigest()
