@@ -1,13 +1,14 @@
 import json, logging, yaml
 from pathlib import Path
+from time import sleep
 from typing import Any
 from httpx import Client, RequestError
-from src.llm.agent_interface import LLMFilterAgent
+from src.llm.agent_interface import LLMFilterAgent, LLMEvaluationResult
 
 logger = logging.getLogger(__name__)
 
 class PurePythonFilterAgent(LLMFilterAgent):
-    def __init__(self, config_path: str | None = None):
+    def __init__(self):
 
         config_path = Path(__file__).parent.parent.parent / "config" / "llm.yaml"
 
@@ -21,8 +22,10 @@ class PurePythonFilterAgent(LLMFilterAgent):
         self.base_url = self.cfg.get("base_url", "http://localhost:11434")
         self.model = self.cfg.get("model", "qwen2.5:3b")
         self.timeout = self.cfg.get("timeout_s", 30)
+        self.batch_size = 10
 
-    def evaluate(self, vacancy: dict[str, Any]) -> dict[str, Any]:
+    def evaluate(self, vacancy: dict[str, Any]) -> LLMEvaluationResult:
+        """evaluates vacancies"""
 
         prompt = self._build_prompt(vacancy)
 
@@ -54,12 +57,12 @@ class PurePythonFilterAgent(LLMFilterAgent):
                     return self._fallback_response("Invalid confidence value")
 
                 # Result Validation (Preventing Hallucinations)
-                return {
+                return LLMEvaluationResult.model_validate({
                     "decision": decision,
                     "confidence": max(0.0, min(1.0, float(llm_response.get("confidence", 0.0)))),
                     "reason": str(llm_response.get("reason", ""))[:200],
                     "tags": llm_response.get("tags", [])
-                }
+                })
 
         except RequestError as e:
             logger.warning(f"Ollama connection failed: {e}. Using fallback.")
@@ -71,7 +74,46 @@ class PurePythonFilterAgent(LLMFilterAgent):
             logger.error(f"Unexpected LLM error: {e}. Using fallback.")
             return self._fallback_response("Unexpected error")
 
-    def _build_prompt(self, vacancy: dict) -> str:
+    def evaluate_batch(self, vacancies: list[dict]) -> list[LLMEvaluationResult]:
+        """evaluates vacancies in batches"""
+        results = []
+
+        for i in range(0, len(vacancies), self.batch_size):
+            batch = vacancies[i:i + self.batch_size]
+            logger.info(f"Processing batch {i // self.batch_size + 1}: {len(batch)} vacancies")
+
+            batch_results = self._build_batch_prompt(batch)
+            results.extend(batch_results)
+
+            if i + self.batch_size < len(vacancies):
+                sleep(1.0)
+
+        return results
+
+    @staticmethod
+    def _build_batch_prompt(batch: list[dict]) -> str:
+        """send one request with list of vacancies"""
+
+        # Prompt for a batch
+        vacancy_list = "\n\n".join([
+            f"### Vacancy {i + 1}:\nTitle: {v['title']}\nCompany: {v['company']}\nDescription: {v['description']}"
+            for i, v in enumerate(batch)
+        ])
+
+        return f"""You are an expert HR assistant specializing in Data Engineering recruitment. 
+Evaluate these {len(batch)} vacancies.
+
+{vacancy_list}
+
+Respond ONLY with a JSON array matching this schema:
+[
+    {{"decision": "accept|reject", "confidence": 0.0-1.0, "reason": "string in Russian", "tags": ["skill1, "skill2""]}},
+    ... (one object per vacancy, in the same order)
+]
+"""
+
+    @staticmethod
+    def _build_prompt(vacancy: dict) -> str:
         return f"""You are an expert HR assistant specializing in Data Engineering recruitment.
 
     TASK: Evaluate if vacancy is a STRONG MATCH for a Data Engineer, DWH Developer, ETL Developer, Analytics Engineer role
@@ -102,11 +144,12 @@ class PurePythonFilterAgent(LLMFilterAgent):
     }}
     """
 
-    def _fallback_response(self, reason: str) -> dict[str, Any]:
+    @staticmethod
+    def _fallback_response(reason: str) -> LLMEvaluationResult:
         """Graceful degradation: fallback to a safe result on LLM failure"""
-        return {
+        return LLMEvaluationResult.model_validate({
             "decision": "uncertain",
             "confidence": 0.0,
             "reason": f"LLM unavailable: {reason}",
             "tags": ["llm_error"]
-        }
+        })

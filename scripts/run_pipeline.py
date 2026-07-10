@@ -75,10 +75,10 @@ def main():
 
             results.append({
                 "source_id": item["source_id"],
-                "decision": llm_res["decision"],
-                "confidence": llm_res["confidence"],
-                "reason": llm_res["reason"],
-                "tags": dumps(llm_res["tags"]),
+                "decision": llm_res.decision,
+                "confidence": llm_res.confidence,
+                "reason": llm_res.reason,
+                "tags": dumps(llm_res.tags),
                 "processed_at": datetime.now(timezone.utc)
             })
 
