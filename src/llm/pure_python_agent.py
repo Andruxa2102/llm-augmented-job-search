@@ -135,6 +135,10 @@ Respond ONLY with a JSON array matching this schema:
     REJECT: "Frontend Developer — React, TypeScript"
     REJECT: "ML Engineer — PyTorch, обучение моделей"
 
+    Vacancy Details:
+    - Role: {vacancy.get('title', 'N/A')}
+    - Description: {vacancy.get('description', 'N/A')}
+    
     Respond ONLY with valid JSON matching this schema:
     {{
         "decision": "accept" | "reject",
