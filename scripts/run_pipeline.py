@@ -1,5 +1,5 @@
-from logging import getLogger, basicConfig, INFO, info, critical
 from json import dumps
+from logging import getLogger, basicConfig, INFO, info, critical
 from os import getcwd
 from sys import exit
 from datetime import datetime, timezone
@@ -69,30 +69,26 @@ def main():
             sess.commit()
 
         # 4. LLM Filter & Save
-        results = []
-        for item in normalized:
-            llm_res = llm.evaluate(item)
-
-            results.append({
-                "source_id": item["source_id"],
-                "decision": llm_res.decision,
-                "confidence": llm_res.confidence,
-                "reason": llm_res.reason,
-                "tags": dumps(llm_res.tags),
-                "processed_at": datetime.now(timezone.utc)
-            })
+        results = llm.evaluate_batch(normalized)
 
         with SessionLocal() as sess:
-            for r in results:
-                existing = sess.query(FilteredVacancy).filter_by(source_id=r["source_id"]).first()
+            for item, llm_res in zip(normalized, results):
+                existing = sess.query(FilteredVacancy).filter_by(source_id=item["source_id"]).first()
                 if existing:
-                    existing.decision = r["decision"]
-                    existing.confidence = r["confidence"]
-                    existing.reason = r["reason"]
-                    existing.tags = r["tags"]
-                    existing.processed_at = r["processed_at"]
+                    existing.decision = llm_res.decision
+                    existing.confidence = llm_res.confidence
+                    existing.reason = llm_res.reason
+                    existing.tags = dumps(llm_res.tags)
+                    existing.processed_at = datetime.now(timezone.utc)
                 else:
-                    sess.add(FilteredVacancy(**r))
+                    sess.add(FilteredVacancy(
+                        source_id=item["source_id"],
+                        decision=llm_res.decision,
+                        confidence=llm_res.confidence,
+                        reason=llm_res.reason,
+                        tags=dumps(llm_res.tags),
+                        processed_at=datetime.now(timezone.utc)
+                    ))
             sess.commit()
 
         logger.info(f"[{source_name}] Processed: {len(results)}")

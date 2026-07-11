@@ -9,12 +9,9 @@ class LLMEvaluationResult(BaseModel):
     reason:     str        # in Russian
     tags:       list[str]
 
+
 class LLMFilterAgent(ABC):
     @abstractmethod
-    def evaluate(self, vacancy: dict[str, Any]) -> LLMEvaluationResult:
-        """Evaluate a vacancy and determine its suitability"""
-        pass
-
     def evaluate_batch(self, vacancies: list[dict[str, Any]]) -> list[LLMEvaluationResult]:
-        """Evaluate multiple vacancies (can be overridden for optimization)"""
-        return [self.evaluate(v) for v in vacancies]
+        """Evaluate multiple vacancies in batches. For single vacancy, call: evaluate_batch([vacancy])[0]"""
+        pass

@@ -1,11 +1,15 @@
 import json, logging, yaml
+from json import JSONDecodeError
 from pathlib import Path
 from time import sleep
-from typing import Any
-from httpx import Client, RequestError
+from ollama import chat, ResponseError
+from pydantic import BaseModel, ValidationError
 from src.llm.agent_interface import LLMFilterAgent, LLMEvaluationResult
 
 logger = logging.getLogger(__name__)
+
+class LLMBatchResponse(BaseModel):
+    results: list[LLMEvaluationResult]
 
 class PurePythonFilterAgent(LLMFilterAgent):
     def __init__(self):
@@ -24,74 +28,65 @@ class PurePythonFilterAgent(LLMFilterAgent):
         self.timeout = self.cfg.get("timeout_s", 30)
         self.batch_size = 10
 
-    def evaluate(self, vacancy: dict[str, Any]) -> LLMEvaluationResult:
-        """evaluates vacancies"""
-
-        prompt = self._build_prompt(vacancy)
-
-        try:
-            with Client(timeout=self.timeout) as client:
-                response = client.post(
-                    f"{self.base_url}/api/generate",
-                    json={
-                        "model": self.model,
-                        "prompt": prompt,
-                        "stream": False,
-                        "format": "json",
-                        "options": {
-                            "temperature": self.cfg.get("temperature", 0.1)
-                        }
-                    }
-                )
-                response.raise_for_status()
-                result = response.json()
-
-                llm_response = json.loads(result["response"])
-                decision = llm_response.get("decision", "")
-
-                if decision not in ["accept", "reject"]:
-                    return self._fallback_response("Invalid decision value")
-
-                confidence = float(llm_response.get("confidence", 0.0))
-                if confidence < 0.0 or confidence > 1.0:
-                    return self._fallback_response("Invalid confidence value")
-
-                # Result Validation (Preventing Hallucinations)
-                return LLMEvaluationResult.model_validate({
-                    "decision": decision,
-                    "confidence": max(0.0, min(1.0, float(llm_response.get("confidence", 0.0)))),
-                    "reason": str(llm_response.get("reason", ""))[:200],
-                    "tags": llm_response.get("tags", [])
-                })
-
-        except RequestError as e:
-            logger.warning(f"Ollama connection failed: {e}. Using fallback.")
-            return self._fallback_response("Connection error")
-        except (json.JSONDecodeError, KeyError) as e:
-            logger.warning(f"Failed to parse LLM JSON response: {e}. Using fallback.")
-            return self._fallback_response("Invalid JSON format")
-        except Exception as e:
-            logger.error(f"Unexpected LLM error: {e}. Using fallback.")
-            return self._fallback_response("Unexpected error")
-
     def evaluate_batch(self, vacancies: list[dict]) -> list[LLMEvaluationResult]:
         """evaluates vacancies in batches"""
-        results = []
+        all_results = []
 
         for i in range(0, len(vacancies), self.batch_size):
             batch = vacancies[i:i + self.batch_size]
             logger.info(f"Processing batch {i // self.batch_size + 1}: {len(batch)} vacancies")
 
-            batch_results = self._build_batch_prompt(batch)
-            results.extend(batch_results)
+            batch_results = self._process_batch(batch)
+            all_results.extend(batch_results)
 
             if i + self.batch_size < len(vacancies):
                 sleep(1.0)
 
-        return results
+        return all_results
+
+    def _process_batch(self, batch: list[dict]) -> list[LLMEvaluationResult]:
+        """Data processing by LLM"""
+        try:
+            response = chat(
+                model = self.model,
+                messages = self._build_prompt(batch),
+                format = LLMBatchResponse.model_json_schema(),
+                options = {"temperature": self.cfg.get("temperature", 0.1)}
+            )
+
+            if hasattr(response, 'message'):
+                raw_content = response.message.content
+            else:
+                raw_content = response['message']['content']
+
+            json_data = json.loads(raw_content)
+            validated_batch = LLMBatchResponse.model_validate(json_data)
+
+            return validated_batch.results
+
+        except ResponseError as e:
+            logger.error(f"Ollama API error (Status {e.status_code}): {e.error}. Using fallback.")
+            return self._fallback_response(f"Ollama API error: {e.error}", len(batch))
+
+        except (ConnectionError, TimeoutError) as e:
+            logger.warning(f"Ollama connection failed: {e}. Using fallback.")
+            return self._fallback_response("Connection error", len(batch))
+
+        except JSONDecodeError as e:
+            logger.warning(f"Failed to parse LLM JSON: {e}. Raw text was: {raw_content[:200]}")
+            return self._fallback_response("Invalid JSON format", len(batch))
+
+        except ValidationError as e:
+            logger.warning(f"Pydantic validation failed: {e.errors()}. Using fallback.")
+            return self._fallback_response("Pydantic structure mismatch", len(batch))
+
+        except Exception as e:
+            logger.error(f"Unexpected pipeline error: {e}", exc_info=True)
+            return self._fallback_response(f"Unexpected error: {str(e)}", len(batch))
+
 
     @staticmethod
-    def _build_batch_prompt(batch: list[dict]) -> str:
+    def _build_prompt(batch: list[dict]) -> list[dict[str, str]]:
         """send one request with list of vacancies"""
 
         # Prompt for a batch
@@ -100,60 +95,54 @@ class PurePythonFilterAgent(LLMFilterAgent):
             for i, v in enumerate(batch)
         ])
 
-        return f"""You are an expert HR assistant specializing in Data Engineering recruitment. 
-Evaluate these {len(batch)} vacancies.
+        system_text = f"""You are an expert HR assistant specializing in Data Engineering recruitment.
+TASK: I will give you {len(batch)} vacancies. 
+Evaluate all vacancies by conditions:
 
-{vacancy_list}
+Condition A (Role & Grade Match):
+- The job title contains keywords: Data Engineer, Analytics Engineer, ETL Developer, DWH Developer, Database Developer, DB Developer, Database Engineer, Data Platform Engineer.
+- AND the grade is suitable: Middle, Middle+, Middle/Senior, Middle+/Senior, Junior/Middle, Junior+/Middle, OR NOT specified.
+(Note: Reject only if it is EXCLUSIVELY pure Lead, Team Lead, Architect, Trainee, or Intern).
 
-Respond ONLY with a JSON array matching this schema:
+Condition B (Tech Stack / Activity Match):
+- The vacancy description explicitly mentions ANY data engineering activity or tools: Data pipelines, ETL, ELT, SQL optimization, data processing.
+
+Set decision to "reject" in all other cases (if Condition A or Condition B is false).
+
+
+IMPORTANT: You MUST return a JSON ARRAY with exactly {len(batch)} objects, one per vacancy.
+Even if there is only 1 vacancy
 [
     {{"decision": "accept|reject", "confidence": 0.0-1.0, "reason": "string in Russian", "tags": ["skill1, "skill2""]}},
     ... (one object per vacancy, in the same order)
 ]
 """
 
-    @staticmethod
-    def _build_prompt(vacancy: dict) -> str:
-        return f"""You are an expert HR assistant specializing in Data Engineering recruitment.
+        role_text = f"""Vacancies for your validation:
+        
+{vacancy_list}
+"""
 
-    TASK: Evaluate if vacancy is a STRONG MATCH for a Data Engineer, DWH Developer, ETL Developer, Analytics Engineer role
-    
-    REJECT in all cases where:
-    - Explicit requirement of 5+ years experience
-    - Senior/Lead/Junior/Trainee/Intern grade explicitly required
-    
-    ACCEPT if not REJECT clause and all of these are present:
-    - Role contains: Data Engineer, Analytics Engineer, Data Developer, DWH Developer, ETL Developer
-    - Description mentions pipeline development, data processing, SQL query optimizing
-    - Experience requirement is 0-4 years OR not specified
-    - Middle or not specified grade
-    
-    Examples:
-    ACCEPT: "Дата-инженер — Опыт от 3 лет. SQL, Python, ETL-пайплайны"
-    ACCEPT: "DWH Developer — Знание SQL, проектирование хранилищ"
-    REJECT: "Senior Data Engineer — 5+ лет опыта, управление командой"
-    REJECT: "Frontend Developer — React, TypeScript"
-    REJECT: "ML Engineer — PyTorch, обучение моделей"
+        out = [
+            {
+                "role": "system",
+                "content": system_text
+            },
+            {
+                "role": "user",
+                "content": role_text
+            }
+        ]
 
-    Vacancy Details:
-    - Role: {vacancy.get('title', 'N/A')}
-    - Description: {vacancy.get('description', 'N/A')}
-    
-    Respond ONLY with valid JSON matching this schema:
-    {{
-        "decision": "accept" | "reject",
-        "confidence": float (0.0 to 1.0),
-        "reason": "string in Russian, max 2 sentences",
-        "tags": ["skill1", "skill2"]
-    }}
-    """
+
+        return out
 
     @staticmethod
-    def _fallback_response(reason: str) -> LLMEvaluationResult:
+    def _fallback_response(reason: str, size: int) -> list[LLMEvaluationResult]:
         """Graceful degradation: fallback to a safe result on LLM failure"""
-        return LLMEvaluationResult.model_validate({
+        return [LLMEvaluationResult.model_validate({
             "decision": "uncertain",
             "confidence": 0.0,
             "reason": f"LLM unavailable: {reason}",
             "tags": ["llm_error"]
-        })
+        })] * size
