@@ -26,7 +26,7 @@ class PurePythonFilterAgent(LLMFilterAgent):
         self.base_url = self.cfg.get("base_url", "http://localhost:11434")
         self.model = self.cfg.get("model", "qwen2.5:3b")
         self.timeout = self.cfg.get("timeout_s", 30)
-        self.batch_size = 10
+        self.batch_size = 5
 
     def evaluate_batch(self, vacancies: list[dict]) -> list[LLMEvaluationResult]:
         """evaluates vacancies in batches"""
@@ -89,34 +89,26 @@ class PurePythonFilterAgent(LLMFilterAgent):
     def _build_prompt(batch: list[dict]) -> list[dict[str, str]]:
         """send one request with list of vacancies"""
 
+        prompt_path = Path(__file__).resolve().parent.parent / "llm" / "prompts" / "Data_Engineer.md"
+        batch_len = len(batch)
+
         # Prompt for a batch
         vacancy_list = "\n\n".join([
             f"### Vacancy {i + 1}:\nTitle: {v['title']}\nCompany: {v['company']}\nDescription: {v['description']}"
             for i, v in enumerate(batch)
         ])
 
-        system_text = f"""You are an expert HR assistant specializing in Data Engineering recruitment.
-TASK: I will give you {len(batch)} vacancies. 
-Evaluate all vacancies by conditions:
+        with open(prompt_path, encoding="utf-8") as f:
+            system_text = f.read()
 
-Condition A (Role & Grade Match):
-- The job title contains keywords: Data Engineer, Analytics Engineer, ETL Developer, DWH Developer, Database Developer, DB Developer, Database Engineer, Data Platform Engineer.
-- AND the grade is suitable: Middle, Middle+, Middle/Senior, Middle+/Senior, Junior/Middle, Junior+/Middle, OR NOT specified.
-(Note: Reject only if it is EXCLUSIVELY pure Lead, Team Lead, Architect, Trainee, or Intern).
-
-Condition B (Tech Stack / Activity Match):
-- The vacancy description explicitly mentions ANY data engineering activity or tools: Data pipelines, ETL, ELT, SQL optimization, data processing.
-
-Set decision to "reject" in all other cases (if Condition A or Condition B is false).
-
-
-IMPORTANT: You MUST return a JSON ARRAY with exactly {len(batch)} objects, one per vacancy.
-Even if there is only 1 vacancy
-[
-    {{"decision": "accept|reject", "confidence": 0.0-1.0, "reason": "string in Russian", "tags": ["skill1, "skill2""]}},
-    ... (one object per vacancy, in the same order)
-]
-"""
+        try:
+            # Используем явные имена переменных
+            system_text = system_text.format(
+                batch_len=batch_len,
+                vacancy_list=vacancy_list
+            )
+        except KeyError as e:
+            logger.warning(f"Missing key in prompt template: {e}")
 
         role_text = f"""Vacancies for your validation:
         
@@ -124,14 +116,8 @@ Even if there is only 1 vacancy
 """
 
         out = [
-            {
-                "role": "system",
-                "content": system_text
-            },
-            {
-                "role": "user",
-                "content": role_text
-            }
+            {"role": "system", "content": system_text},
+            {"role": "user", "content": role_text}
         ]
 
 
