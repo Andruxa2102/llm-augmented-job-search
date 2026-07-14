@@ -2,7 +2,7 @@ from json import dumps
 from logging import getLogger, basicConfig, INFO, info, critical
 from os import getcwd
 from sys import exit
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 from pathlib import Path
 from dotenv import load_dotenv
 from src.adapters.registry import get_adapter_class
@@ -20,6 +20,8 @@ from src.config.loader import load_sources_config, ConfigLoadError
 
 basicConfig(level=INFO, format="%(asctime)s | %(levelname)s | %(message)s")
 logger = getLogger(__name__)
+RE_EVALUATION_THRESHOLD_DAYS = 30
+
 
 info(f"CWD: {getcwd()}")
 info(f"__file__: {__file__}")
@@ -69,6 +71,33 @@ def main():
             sess.commit()
 
         # 4. LLM Filter & Save
+        threshold_date = datetime.now(timezone.utc) - timedelta(days=RE_EVALUATION_THRESHOLD_DAYS)
+
+        # Get source_id of vacancies evaluated last 30 days
+        with SessionLocal() as sess:
+            recently_evaluated_ids = {
+                row.source_id
+                for row in sess.query(FilteredVacancy.source_id)
+                .filter(FilteredVacancy.source_id.in_([item["source_id"] for item in normalized]))
+                .filter(FilteredVacancy.processed_at > threshold_date)
+                .all()
+            }
+
+        items_to_evaluate = [
+            item for item in normalized
+            if item["source_id"] not in recently_evaluated_ids
+        ]
+
+        skipped_count = len(normalized) - len(items_to_evaluate)
+        logger.info(
+            f"[{source_name}] LLM evaluation: {len(items_to_evaluate)} to process, "
+            f"{skipped_count} skipped (evaluated within last {RE_EVALUATION_THRESHOLD_DAYS} days)"
+        )
+
+        if not items_to_evaluate:
+            logger.info(f"[{source_name}] No new vacancies to evaluate. Skipping LLM step.")
+            continue
+
         results = llm.evaluate_batch(normalized)
 
         with SessionLocal() as sess:
