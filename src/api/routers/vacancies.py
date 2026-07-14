@@ -8,6 +8,9 @@ from src.api.schemas import VacancyResponse, FilteredVacancyResponse
 router = APIRouter(prefix="/vacancies", tags=["vacancies"])
 
 
+def pagination_parameters(skip: int = 0, limit: int = 100):
+    return {"skip": skip, "limit": limit}
+
 def _parse_tags(tags_json: str | None) -> list[str]:
     """Convert JSON-string of tags into the list"""
     if not tags_json:
@@ -18,7 +21,6 @@ def _parse_tags(tags_json: str | None) -> list[str]:
     except (JSONDecodeError, TypeError):
         return []
 
-
 def _extract_decision(decision_obj) -> str:
     """Get a string value from ENUM"""
     if hasattr(decision_obj, 'value'):
@@ -28,28 +30,33 @@ def _extract_decision(decision_obj) -> str:
 
 @router.get("/raw", response_model=list[VacancyResponse])
 def get_raw_vacancies(
-        limit: int = Query(50, ge=1, le=200),
+        pagination: dict = Depends(pagination_parameters),
         db: Session = Depends(get_db)
 ):
     """Get raw (unfiltered) vacancies"""
+
+    skip, limit = pagination["skip"], pagination["limit"]
+    offset = skip * limit
     query = db.query(RawVacancy)
-    return query.order_by(RawVacancy.fetched_at.desc()).limit(limit).all()
+    return query.order_by(RawVacancy.fetched_at.desc()).limit(limit).offset(offset).all()
 
 
 @router.get("/unrejected", response_model=list[FilteredVacancyResponse])
 def get_filtered_unrejected(
-        limit: int = Query(50, ge=1, le=200),
+        pagination: dict = Depends(pagination_parameters),
         db: Session = Depends(get_db)
 ):
     """Get LLM-filtered unrejected vacancies with raw data (title, company, url)"""
 
+    skip, limit = pagination["skip"], pagination["limit"]
+    offset = skip * limit
     query = db.query(
         FilteredVacancy, RawVacancy).join(
         RawVacancy, FilteredVacancy.source_id == RawVacancy.source_id
     )
 
     query = query.filter(FilteredVacancy.decision != "reject")
-    results = query.order_by(FilteredVacancy.processed_at.desc()).limit(limit).all()
+    results = query.order_by(FilteredVacancy.processed_at.desc()).limit(limit).offset(offset).all()
 
     return [
         FilteredVacancyResponse(
@@ -70,17 +77,19 @@ def get_filtered_unrejected(
 
 @router.get("/rejected", response_model=list[FilteredVacancyResponse])
 def get_filtered_rejected(
-        limit: int = Query(50, ge=1, le=200),
+        pagination: dict = Depends(pagination_parameters),
         db: Session = Depends(get_db)
 ):
     """Get LLM-filtered rejected vacancies with raw data (title, company, url)"""
 
+    skip, limit = pagination["skip"], pagination["limit"]
+    offset = skip * limit
     query = db.query(FilteredVacancy, RawVacancy).join(
         RawVacancy, FilteredVacancy.source_id == RawVacancy.source_id
     )
 
     query = query.filter(FilteredVacancy.decision == "reject")
-    results = query.order_by(FilteredVacancy.processed_at.desc()).limit(limit).all()
+    results = query.order_by(FilteredVacancy.processed_at.desc()).limit(limit).offset(offset).all()
 
     return [
         FilteredVacancyResponse(
