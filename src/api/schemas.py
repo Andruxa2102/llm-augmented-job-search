@@ -33,10 +33,3 @@ class FilteredVacancyResponse(BaseModel):
 
     class Config:
         from_attributes = True
-
-
-class StatsResponse(BaseModel):
-    total_raw: int
-    total_filtered: int
-    by_decision: dict[str, int]
-    by_source: dict[str, int]
