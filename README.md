@@ -37,6 +37,10 @@ llm-augmented-work-search/
 │   │   └── models.py             	    # ORM-models
 │   ├── api/                            # REST API
 │   │   ├── main.py               	    # FASTAPI endpoints
+│   │   ├── routers/
+│   │   │   └── vacancies.py            # Endpoints for vacancies
+│   │   ├── schemas.py
+│   │   └── dependencies.py
 │   ├── utils/      
 │   │   └── logger.py
 │   └── config/

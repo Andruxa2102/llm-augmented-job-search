@@ -1,28 +1,25 @@
-from fastapi import FastAPI, Depends
-from sqlalchemy.orm import Session
-from pydantic import BaseModel, ConfigDict
-from datetime import datetime
-from src.storage.db import SessionLocal
-from src.storage.models import FilteredVacancy
+from contextlib import asynccontextmanager
+from fastapi import FastAPI
+from src.api.routers import vacancies
+from src.storage.db import Base, engine
 
-app = FastAPI(title="LLM augmented job search", version="1.0.0")
 
-def get_db():
-    db = SessionLocal()
-    try: yield db
-    finally: db.close()
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """Create tables if not exists"""
+    Base.metadata.create_all(bind=engine)
+    yield
 
-class VacancyOut(BaseModel):
-    model_config = ConfigDict(from_attributes=True)
-    id: str
-    title: str
-    company: str
-    url: str
-    reason: str
-    confidence: float
-    processed_at: datetime
 
-@app.get("/api/v1/vacancies", response_model=list[VacancyOut])
-def get_vacancies(db: Session = Depends(get_db)):
-    return db.query(FilteredVacancy).filter(FilteredVacancy.llm_pass == True)\
-        .order_by(FilteredVacancy.processed_at.desc()).limit(50).all()
+app = FastAPI(
+    title="LLM-Augmented Job Search API",
+    description="API for an accessing LLM-filtered vacancies",
+    version="0.1.0",
+    lifespan=lifespan
+)
+
+app.include_router(vacancies.router)
+
+@app.get("/")
+def root():
+    return {"message": "Welcome to LLM-Augmented Job Search API", "docs": "/docs"}
