@@ -11,9 +11,10 @@ An automated ETL pipeline for extracting vacancy data, filtering it using an LLM
 
 - **Module architecture**:          adapters, parsers, LLM-agent, storage - all isolated;
 - **Type safety and validation**:   Pydantic models for configs, strict data checking;
-- **Idempotency**:                  repeating launches do not create duplicates (UPSERT via `merge`);
+- **Idempotency**:                  repeating launches do not create duplicates;
 - **Graceful degradation**:         if LLM is inaccessible, the pipeline continues working with fallback logic;
 - **Security**:                     URL and headers are stored in the environment variables - not committed to Git;
+- **Authenification**:              Oath2 and user management;
 ```
 
 ## Architecture
@@ -37,8 +38,9 @@ llm-augmented-work-search/
 │   │   └── models.py             	    # ORM-models
 │   ├── api/                            # REST API
 │   │   ├── main.py               	    # FASTAPI endpoints
+│   │   ├── security.py                 # authentication and User Management
 │   │   ├── routers/
-│   │   │   └── vacancies.py            # Endpoints for vacancies
+│   │   │   └── vacancies.py            # endpoints for vacancies
 │   │   ├── schemas.py
 │   │   └── dependencies.py
 │   ├── utils/      
