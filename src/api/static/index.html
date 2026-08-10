@@ -1,160 +1,186 @@
 <!DOCTYPE html>
 <html lang="ru">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Job Search Dashboard</title>
-<style>
-* { box-sizing: border-box; margin: 0; padding: 0; }
-body { font-family: system-ui, sans-serif; background: #f5f5f5; color: #333; padding: 20px; }
-/* Login Form */
-#login-section { max-width: 400px; margin: 100px auto; background: white; padding: 30px; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
-#login-section h2 { margin-bottom: 20px; text-align: center; }
-input { width: 100%; padding: 10px; margin-bottom: 15px; border: 1px solid #ddd; border-radius: 4px; font-size: 14px; }
-button { width: 100%; padding: 12px; background: #2563eb; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 16px; }
-button:hover { background: #1d4ed8; }
-.error { color: #dc2626; margin-top: 10px; text-align: center; display: none; }
-/* Dashboard */
-#dashboard { display: none; max-width: 1200px; margin: 0 auto; }
-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
-header h1 { font-size: 24px; }
-.logout-btn { background: #6b7280; padding: 8px 16px; width: auto; font-size: 14px; }
-/* Tabs */
-.tabs { display: flex; gap: 10px; margin-bottom: 20px; }
-.tab { padding: 10px 20px; background: white; border: 1px solid #ddd; border-radius: 4px; cursor: pointer; }
-.tab.active { background: #2563eb; color: white; border-color: #2563eb; }
-/* Table */
-table { width: 100%; border-collapse: collapse; background: white; border-radius: 8px; overflow: hidden; box-shadow: 0 1px 3px rgba(0,0,0,0.1); }
-th, td { padding: 12px 15px; text-align: left; border-bottom: 1px solid #eee; }
-th { background: #f9fafb; font-weight: 600; font-size: 13px; text-transform: uppercase; color: #6b7280; }
-tr:hover { background: #f9fafb; }
-.badge { padding: 3px 8px; border-radius: 12px; font-size: 12px; font-weight: 500; }
-.badge.accept { background: #dcfce7; color: #166534; }
-.badge.reject { background: #fee2e2; color: #991b1b; }
-.badge.uncertain { background: #fef3c7; color: #92400e; }
-a { color: #2563eb; text-decoration: none; }
-a:hover { text-decoration: underline; }
-.loading { text-align: center; padding: 40px; color: #6b7280; }
-</style>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Job Search Dashboard</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { font-family: system-ui, sans-serif; background: #f5f5f5; color: #333; padding: 20px; }
+
+        /* Login Form */
+        #login-section { max-width: 400px; margin: 100px auto; background: white; padding: 30px; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
+        #login-section h2 { margin-bottom: 20px; text-align: center; }
+        input { width: 100%; padding: 10px; margin-bottom: 15px; border: 1px solid #ddd; border-radius: 4px; font-size: 14px; }
+        button { width: 100%; padding: 12px; background: #2563eb; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 16px; }
+        button:hover { background: #1d4ed8; }
+        .error { color: #dc2626; margin-top: 10px; text-align: center; display: none; }
+
+        /* Dashboard */
+        #dashboard { display: none; max-width: 1200px; margin: 0 auto; }
+        header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
+        header h1 { font-size: 24px; }
+        .logout-btn { background: #6b7280; padding: 8px 16px; width: auto; font-size: 14px; }
+
+        /* Tabs */
+        .tabs { display: flex; gap: 10px; margin-bottom: 20px; }
+        .tab { padding: 10px 20px; background: white; border: 1px solid #ddd; border-radius: 4px; cursor: pointer; }
+        .tab.active { background: #2563eb; color: white; border-color: #2563eb; }
+
+        /* Table */
+        table { width: 100%; border-collapse: collapse; background: white; border-radius: 8px; overflow: hidden; box-shadow: 0 1px 3px rgba(0,0,0,0.1); }
+        th, td { padding: 12px 15px; text-align: left; border-bottom: 1px solid #eee; }
+        th { background: #f9fafb; font-weight: 600; font-size: 13px; text-transform: uppercase; color: #6b7280; }
+        tr:hover { background: #f9fafb; }
+        .badge { padding: 3px 8px; border-radius: 12px; font-size: 12px; font-weight: 500; }
+        .badge.accept { background: #dcfce7; color: #166534; }
+        .badge.reject { background: #fee2e2; color: #991b1b; }
+        .badge.uncertain { background: #fef3c7; color: #92400e; }
+        a { color: #2563eb; text-decoration: none; }
+        a:hover { text-decoration: underline; }
+        .loading { text-align: center; padding: 40px; color: #6b7280; }
+    </style>
 </head>
 <body>
-<!-- Login Section -->
-<div id="login-section">
-<h2>🔐 Вход в систему</h2>
-<input type="text" id="username" placeholder="Логин" value="admin">
-<input type="password" id="password" placeholder="Пароль">
-<button onclick="login()">Войти</button>
-<div class="error" id="login-error"></div>
-</div>
+    <!-- Login Section -->
+    <div id="login-section">
+        <h2>🔐 Login to system </h2>
+        <input type="text" id="username" placeholder="Login" value="admin">
+        <input type="password" id="password" placeholder="Password">
+        <button onclick="login()">Sign in</button>
+        <div class="error" id="login-error"></div>
+    </div>
 
-<!-- Dashboard -->
-<div id="dashboard">
-<header>
-<h1>📋 Вакансии Data Engineer</h1>
-<button class="logout-btn" onclick="logout()">Выйти</button>
-</header>
-<div class="tabs">
-<div class="tab active" onclick="loadVacancies('unrejected')">✅ Подходящие</div>
-<div class="tab" onclick="loadVacancies('rejected')">❌ Отклонённые</div>
-<div class="tab" onclick="loadVacancies('raw')">📦 Все (raw)</div>
-</div>
-<div id="content"><div class="loading">Загрузка...</div></div>
-</div>
+    <!-- Dashboard -->
+    <div id="dashboard">
+        <header>
+            <h1>📋 Vacancies Data Engineer</h1>
+            <button class="logout-btn" onclick="logout()">Logout</button>
+        </header>
+
+        <div class="tabs">
+            <div class="tab active" data-type="unrejected" onclick="loadVacancies('unrejected', this)">✅ Confirmed</div>
+            <div class="tab" data-type="rejected" onclick="loadVacancies('rejected', this)">❌ Rejected</div>
+            <div class="tab" data-type="raw" onclick="loadVacancies('raw', this)">📦 All (raw)</div>
+        </div>
+
+        <div id="content"><div class="loading">Loading...</div></div>
+    </div>
 
 <script>
 let token = null;
-const API = ''; // Тот же хост, что и страница
+const API = '';
+
+// --- Security: HTML escaping ---
+function esc(str) {
+    if (!str) return '';
+    const div = document.createElement('div');
+    div.textContent = str;
+    return div.innerHTML;
+}
+
+// --- Security: URL validation (protect from javascript: URI) ---
+function safeUrl(url) {
+    if (!url) return '#';
+    try {
+        const parsed = new URL(url);
+        if (!['http:', 'https:'].includes(parsed.protocol)) return '#';
+        return url;
+    } catch {
+        return '#';
+    }
+}
 
 // --- Auth ---
 async function login() {
-const username = document.getElementById('username').value;
-const password = document.getElementById('password').value;
-const errorEl = document.getElementById('login-error');
-try {
-const res = await fetch(`${API}/auth/login`, {
-method: 'POST',
-headers: { 'Content-Type': 'application/json' },
-body: JSON.stringify({ username, password })
-});
-if (!res.ok) throw new Error('Неверный логин или пароль');
-const data = await res.json();
-token = data.access_token;
-document.getElementById('login-section').style.display = 'none';
-document.getElementById('dashboard').style.display = 'block';
-loadVacancies('unrejected');
-} catch (e) {
-errorEl.textContent = e.message;
-errorEl.style.display = 'block';
-}
+    const username = document.getElementById('username').value;
+    const password = document.getElementById('password').value;
+    const errorEl = document.getElementById('login-error');
+
+    try {
+        const res = await fetch(`${API}/auth/login`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ username, password })
+        });
+
+        if (!res.ok) throw new Error('Invalid login or password');
+
+        const data = await res.json();
+        token = data.access_token;
+
+        document.getElementById('login-section').style.display = 'none';
+        document.getElementById('dashboard').style.display = 'block';
+        loadVacancies('unrejected', document.querySelector('.tab[data-type="unrejected"]'));
+    } catch (e) {
+        errorEl.textContent = e.message;
+        errorEl.style.display = 'block';
+    }
 }
 
 function logout() {
-token = null;
-document.getElementById('dashboard').style.display = 'none';
-document.getElementById('login-section').style.display = 'block';
-document.getElementById('password').value = '';
+    token = null;
+    document.getElementById('dashboard').style.display = 'none';
+    document.getElementById('login-section').style.display = 'block';
+    document.getElementById('password').value = '';
+    document.getElementById('login-error').style.display = 'none';
 }
 
 // --- API Calls ---
 async function apiGet(url) {
-const res = await fetch(`${API}${url}`, {
-headers: { 'Authorization': `Bearer ${token}` }
-});
-if (res.status === 401) { logout(); return []; }
-return res.json();
+    const res = await fetch(`${API}${url}`, {
+        headers: { 'Authorization': `Bearer ${token}` }
+    });
+    if (res.status === 401) { logout(); return []; }
+    return res.json();
 }
 
 // --- Render ---
-async function loadVacancies(type) {
-// Update tabs
-document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
-event?.target?.classList?.add('active');
-const content = document.getElementById('content');
-content.innerHTML = '<div class="loading">Загрузка...</div>';
-let items;
-if (type === 'raw') {
-items = await apiGet('/vacancies/raw?limit=100');
-content.innerHTML = renderRawTable(items);
-} else {
-items = await apiGet(`/vacancies/${type}?limit=100`);
-content.innerHTML = renderFilteredTable(items);
-}
+async function loadVacancies(type, tabEl) {
+    // Update tabs
+    document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+    if (tabEl) tabEl.classList.add('active');
+
+    const content = document.getElementById('content');
+    content.innerHTML = '<div class="loading">Loading...</div>';
+
+    let items;
+    if (type === 'raw') {
+        items = await apiGet('/vacancies/raw?skip=0&limit=100');
+        content.innerHTML = renderRawTable(items);
+    } else {
+        items = await apiGet(`/vacancies/${type}?skip=0&limit=100`);
+        content.innerHTML = renderFilteredTable(items);
+    }
 }
 
 function renderFilteredTable(items) {
-if (!items.length) return '<div class="loading">Нет вакансий</div>';
-return `<table>
-<tr><th>Компания</th><th>Позиция</th><th>Решение</th><th>Уверенность</th><th>Причина</th><th>Ссылка</th></tr>
-${items.map(v => `<tr>
-<td><strong>${esc(v.company)}</strong></td>
-<td>${esc(v.title)}</td>
-<td><span class="badge ${v.decision}">${v.decision}</span></td>
-<td>${Math.round(v.confidence * 100)}%</td>
-<td>${esc(v.reason)}</td>
-<td><a href="${esc(v.url)}" target="_blank">Открыть ↗</a></td>
-</tr>`).join('')}
-</table>`;
+    if (!items.length) return '<div class="loading">No vacancies</div>';
+    return `<table>
+        <tr><th>Company</th><th>Position</th><th>Decision</th><th>Confidence</th><th>Reason</th><th>Url</th></tr>
+        ${items.map(v => `<tr>
+            <td><strong>${esc(v.company)}</strong></td>
+            <td>${esc(v.title)}</td>
+            <td><span class="badge ${esc(v.decision)}">${esc(v.decision)}</span></td>
+            <td>${Math.round(v.confidence * 100)}%</td>
+            <td>${esc(v.reason)}</td>
+            <td><a href="${safeUrl(v.url)}" target="_blank" rel="noopener noreferrer">Open ↗</a></td>
+        </tr>`).join('')}
+    </table>`;
 }
 
 function renderRawTable(items) {
-if (!items.length) return '<div class="loading">Нет вакансий</div>';
-return `<table>
-<tr><th>Компания</th><th>Позиция</th><th>Источник</th><th>Дата</th><th>Ссылка</th></tr>
-${items.map(v => `<tr>
-<td><strong>${esc(v.company)}</strong></td>
-<td>${esc(v.title)}</td>
-<td>${esc(v.source)}</td>
-<td>${new Date(v.fetched_at).toLocaleDateString('ru-RU')}</td>
-<td><a href="${esc(v.url)}" target="_blank">Открыть ↗</a></td>
-</tr>`).join('')}
-</table>`;
-}
-
-function esc(str) {
-if (!str) return '';
-const div = document.createElement('div');
-div.textContent = str;
-return div.innerHTML;
+    if (!items.length) return '<div class="loading">No vacancies</div>';
+    return `<table>
+        <tr><th>Company</th><th>Position</th><th>Source</th><th>Data</th><th>Url</th></tr>
+        ${items.map(v => `<tr>
+            <td><strong>${esc(v.company)}</strong></td>
+            <td>${esc(v.title)}</td>
+            <td>${esc(v.source)}</td>
+            <td>${new Date(v.fetched_at).toLocaleDateString('ru-RU')}</td>
+            <td><a href="${safeUrl(v.url)}" target="_blank" rel="noopener noreferrer">Open ↗</a></td>
+        </tr>`).join('')}
+    </table>`;
 }
 </script>
 </body>

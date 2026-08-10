@@ -5,7 +5,24 @@ from fastapi import FastAPI
 from fastapi_offline import FastAPIOffline
 from src.storage.db import Base, engine
 from src.api.routers import vacancies, auth
+from starlette.middleware.base import BaseHTTPMiddleware
 
+
+class SecurityHeadersMiddleware(BaseHTTPMiddleware):
+    """Add Security headers for all responses"""
+    async def dispatch(self, request, call_next):
+        response = await call_next(request)
+        response.headers["X-Content-Type-Options"] = "nosniff"
+        response.headers["X-Frame-Options"] = "DENY"
+        response.headers["X-XSS-Protection"] = "1; mode=block"
+        response.headers["Content-Security-Policy"] = (
+            "default-src 'self'; "
+            "script-src 'self' 'unsafe-inline'; "
+            "style-src 'self' 'unsafe-inline'; "
+            "img-src 'self' data:; "
+            "frame-ancestors 'none'"
+        )
+        return response
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -22,6 +39,7 @@ app = FastAPIOffline(
 )
 
 
+app.add_middleware(SecurityHeadersMiddleware)
 app.include_router(auth.router)
 app.include_router(vacancies.router)
 
