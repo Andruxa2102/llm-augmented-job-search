@@ -3,13 +3,15 @@ from pathlib import Path
 from fastapi.staticfiles import StaticFiles
 from fastapi import FastAPI
 from fastapi_offline import FastAPIOffline
+from fastapi.middleware.cors import CORSMiddleware
+
 from src.storage.db import Base, engine
 from src.api.routers import vacancies, auth
 from starlette.middleware.base import BaseHTTPMiddleware
 
 
 class SecurityHeadersMiddleware(BaseHTTPMiddleware):
-    """Add Security headers for all responses"""
+    """Add Security headers to all responses"""
     async def dispatch(self, request, call_next):
         response = await call_next(request)
         response.headers["X-Content-Type-Options"] = "nosniff"
@@ -38,6 +40,17 @@ app = FastAPIOffline(
     lifespan=lifespan
 )
 
+origins = [
+    "http://localhost:8000",
+    "http://127.0.0.1:8000",
+]
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=origins,
+    allow_credentials=True,
+    allow_methods=["GET", "POST", "DELETE"],
+    allow_headers=["Authorization", "Content-Type"],
+)
 
 app.add_middleware(SecurityHeadersMiddleware)
 app.include_router(auth.router)
