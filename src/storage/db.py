@@ -1,6 +1,6 @@
 from pathlib import Path
 from typing import Generator
-from sqlalchemy import create_engine
+from sqlalchemy import create_engine, text
 from sqlalchemy.orm import sessionmaker, DeclarativeBase, Session
 from pydantic_settings import BaseSettings
 
@@ -32,7 +32,12 @@ else:
 
 db_file_path = Path(final_db_url.replace("sqlite:///", ""))
 db_file_path.parent.mkdir(parents=True, exist_ok=True)
+
 engine = create_engine(final_db_url, pool_pre_ping=True, echo=False)
+with engine.connect() as conn:
+    conn.execute(text("PRAGMA journal_mode=WAL"))
+    conn.commit()
+
 SessionLocal = sessionmaker(bind=engine)
 
 

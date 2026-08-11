@@ -37,11 +37,7 @@ ENV/
 Thumbs.db
 
 # Data & DB
-data/raw/*.json
-data/processed/*.parquet
-data/*.db
-data/*.sqlite
-data/*.log
+data/*
 
 # Config & Secrets
 .env
