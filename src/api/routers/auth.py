@@ -1,7 +1,9 @@
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status, Request
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 from datetime import datetime, timezone, timedelta
+
+from src.api.rate_limiter import limiter
 from src.storage.db import get_db
 from src.storage.models import User
 from src.api.security import verify_password, create_access_token, hash_password, get_current_user, UserResponse
@@ -28,7 +30,8 @@ class RegisterRequest(BaseModel):
 
 
 @router.post("/login", response_model=TokenResponse)
-def login(credentials: LoginRequest, db: Session = Depends(get_db)):
+@limiter.limit("5/minute")
+def login(request: Request, credentials: LoginRequest, db: Session = Depends(get_db)):
     """Get JWT-токен"""
     user = db.query(User).filter(User.username == credentials.username).first()
 
@@ -53,8 +56,10 @@ def login(credentials: LoginRequest, db: Session = Depends(get_db)):
 
 
 @router.post("/register", response_model=UserResponse, status_code=201)
+@limiter.limit("3/hour")
 def register(
-        request: RegisterRequest,
+        request: Request,
+        body: RegisterRequest,
         db: Session = Depends(get_db),
         current_user: User = Depends(get_current_user)  # Требует авторизации
 ):
@@ -62,14 +67,14 @@ def register(
     if not current_user.is_admin:
         raise HTTPException(status_code=403, detail="Only admins can register new users")
 
-    existing = db.query(User).filter(User.username == request.username).first()
+    existing = db.query(User).filter(User.username == body.username).first()
     if existing:
         raise HTTPException(status_code=400, detail="Username already exists")
 
     new_user = User(
-        username=request.username,
-        hashed_password=hash_password(request.password),
-        is_admin=request.is_admin
+        username=body.username,
+        hashed_password=hash_password(body.password),
+        is_admin=body.is_admin
     )
     db.add(new_user)
     db.commit()
@@ -79,6 +84,7 @@ def register(
 
 
 @router.get("/me", response_model=UserResponse)
-def get_current_user_info(current_user: User = Depends(get_current_user)):
+@limiter.limit("5/minute")
+def get_current_user_info(request: Request, current_user: User = Depends(get_current_user)):
     """Get user info"""
     return current_user

@@ -1,6 +1,8 @@
 from json import loads, JSONDecodeError
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Request
 from sqlalchemy.orm import Session
+
+from src.api.rate_limiter import limiter
 from src.storage.db import get_db
 from src.storage.models import RawVacancy, FilteredVacancy
 from src.api.schemas import VacancyResponse, FilteredVacancyResponse
@@ -31,7 +33,9 @@ def _extract_decision(decision_obj) -> str:
 
 
 @router.get("/raw", response_model=list[VacancyResponse])
+@limiter.limit("60/minute")
 def get_raw_vacancies(
+        request: Request,
         pagination: dict = Depends(pagination_parameters),
         current_user: User = Depends(get_current_user),
         db: Session = Depends(get_db)
@@ -45,7 +49,9 @@ def get_raw_vacancies(
 
 
 @router.get("/unrejected", response_model=list[FilteredVacancyResponse])
+@limiter.limit("60/minute")
 def get_filtered_unrejected(
+        request: Request,
         pagination: dict = Depends(pagination_parameters),
         current_user: User = Depends(get_current_user),
         db: Session = Depends(get_db)
@@ -82,7 +88,9 @@ def get_filtered_unrejected(
 
 
 @router.get("/rejected", response_model=list[FilteredVacancyResponse])
+@limiter.limit("60/minute")
 def get_filtered_rejected(
+        request: Request,
         pagination: dict = Depends(pagination_parameters),
         current_user: User = Depends(get_current_user),
         db: Session = Depends(get_db)
