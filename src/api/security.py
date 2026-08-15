@@ -19,9 +19,14 @@ load_dotenv(dotenv_path=env_path)
 SECRET_KEY = environ.get("JWT_SECRET_KEY")
 if not SECRET_KEY:
     raise RuntimeError(
-        "JWT_SECRET_KEY is not set in environment or .env file. "
-        "Generate one with: python -c \"import secrets; print(secrets.token_hex(32))\""
+        "JWT_SECRET_KEY is not set"
     )
+if len(SECRET_KEY) < 32:
+    raise RuntimeError(
+        f"JWT_SECRET_KEY too short ({len(SECRET_KEY)} chars). "
+        "Minimum 32 characters required."
+    )
+
 
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = 60
@@ -57,8 +62,13 @@ def verify_password(plain_password: str, hashed_password: str) -> bool:
 def create_access_token(data: dict, expires_delta: timedelta | None = None) -> str:
     """create JWT-token"""
     to_encode = data.copy()
-    expire = datetime.now(timezone.utc) + (expires_delta or timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES))
-    to_encode.update({"exp": expire})
+    now = datetime.now(timezone.utc)
+    expire = now + (expires_delta or timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES))
+    to_encode.update({
+        "exp": expire,
+        "iat": now,
+        "iss": "job-search-api",
+    })
     return jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
 
 
@@ -76,8 +86,9 @@ def decode_token(token: str) -> dict:
         payload = jwt.decode(
             token,
             SECRET_KEY,
-            algorithms=[ALGORITHM]
-        )
+            algorithms=[ALGORITHM],
+            issuer = "job-search-api")
+
         return payload
     except JWTError:
         raise HTTPException(
