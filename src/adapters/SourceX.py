@@ -81,7 +81,7 @@ class SourceXAdapter(JobSource):
         page = self.cfg.pagination.start_page
         config_limit = self.cfg.pagination.max_pages if self.cfg.pagination.max_pages > 0 else float('inf')
         effective_limit = 0
-        html_hint = None
+        html_hint = 1
 
         while True:
             html = self._fetch_page(page)
@@ -92,11 +92,10 @@ class SourceXAdapter(JobSource):
 
             soup = BeautifulSoup(html, "lxml")
 
-            if page == self.cfg.pagination.start_page and html_hint is None:
+            if page == self.cfg.pagination.start_page or page == html_hint:
                 parsed = parse_max_pages_hint(soup)
                 html_hint = parsed if parsed and parsed > 0 else config_limit
                 effective_limit = min(html_hint, config_limit)
-                logger.info(f"Pagination limit: config={config_limit}, html_hint={html_hint}")
 
             if self.cfg.pagination.stop_on_empty and not has_vacancies(soup):
                 logger.warning(f"No vacancies at page {page}, stopping")
@@ -115,20 +114,30 @@ class SourceXAdapter(JobSource):
     def _fetch_page(self, page: int) -> str:
         """Fetches single page HTML from Web"""
 
-        if page == 1:
-            params = {
-                "text": self.cfg.query
-            }
-        else:
-            params = {
-                "text": self.cfg.query,
-                self.cfg.pagination.param_name: page
-            }
+        params = {
+            "area": 1,
+            "items_on_page": 100,
+            "ored_clusters": "true",
+            "search_period": 1,
+            "hhtmFromLabel": "chip_filter",
+            "hhtmFrom": "vacancy_search_list",
+            "text": self.cfg.query,
+            "search_field": ["name", "company_name", "description"],  # ← Список → 3 отдельных параметра в URL
+            "enable_snippets": "true",
+            "hhtmSource": "vacancy_search_list",
+            "hhtmSourceLabel": "vacancy_search_list",
+        }
+        if page != 1:
+            params[self.cfg.pagination.param_name] = page
 
         headers = self._load_headers()
 
         try:
             with Client(timeout=30.0) as client:
+
+                req = client.build_request("GET", str(self.cfg.base_url), params=params, headers=headers)
+                logger.info(f"Request URL: {req.url}")
+
                 response = client.get(
                     str(self.cfg.base_url),
                     params=params,
