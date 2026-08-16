@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="ru">
+<html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -32,10 +32,6 @@
         th, td { padding: 12px 15px; text-align: left; border-bottom: 1px solid #eee; }
         th { background: #f9fafb; font-weight: 600; font-size: 13px; text-transform: uppercase; color: #6b7280; }
         tr:hover { background: #f9fafb; }
-        .badge { padding: 3px 8px; border-radius: 12px; font-size: 12px; font-weight: 500; }
-        .badge.accept { background: #dcfce7; color: #166534; }
-        .badge.reject { background: #fee2e2; color: #991b1b; }
-        .badge.uncertain { background: #fef3c7; color: #92400e; }
         a { color: #2563eb; text-decoration: none; }
         a:hover { text-decoration: underline; }
         .loading { text-align: center; padding: 40px; color: #6b7280; }
@@ -44,24 +40,39 @@
 <body>
     <!-- Login Section -->
     <div id="login-section">
-        <h2>🔐 Login to system </h2>
-        <input type="text" id="username" placeholder="Login" value="admin">
-        <input type="password" id="password" placeholder="Password">
-        <button onclick="login()">Sign in</button>
+        <h2>🔐 Sign In</h2>
+        <form onsubmit="event.preventDefault(); login();">
+            <input
+                type="text"
+                id="username"
+                placeholder="Username"
+                value="admin"
+                autocomplete="username"
+                required
+            >
+            <input
+                type="password"
+                id="password"
+                placeholder="Password"
+                autocomplete="current-password"
+                required
+            >
+            <button type="submit">Sign In</button>
+        </form>
         <div class="error" id="login-error"></div>
     </div>
 
     <!-- Dashboard -->
     <div id="dashboard">
         <header>
-            <h1>📋 Vacancies Data Engineer</h1>
-            <button class="logout-btn" onclick="logout()">Logout</button>
+            <h1>📋 Data Engineer Vacancies</h1>
+            <button class="logout-btn" onclick="logout()">Sign Out</button>
         </header>
 
         <div class="tabs">
             <div class="tab active" data-type="unrejected" onclick="loadVacancies('unrejected', this)">✅ Confirmed</div>
             <div class="tab" data-type="rejected" onclick="loadVacancies('rejected', this)">❌ Rejected</div>
-            <div class="tab" data-type="raw" onclick="loadVacancies('raw', this)">📦 All (raw)</div>
+            <div class="tab" data-type="raw" onclick="loadVacancies('raw', this)">📦 All (Raw)</div>
         </div>
 
         <div id="content"><div class="loading">Loading...</div></div>
@@ -79,7 +90,7 @@ function esc(str) {
     return div.innerHTML;
 }
 
-// --- Security: URL validation (protect from javascript: URI) ---
+// --- Security: URL validation (protects against javascript: URI) ---
 function safeUrl(url) {
     if (!url) return '#';
     try {
@@ -89,6 +100,22 @@ function safeUrl(url) {
     } catch {
         return '#';
     }
+}
+
+// --- Date Formatting: DD.MM.YYYY HH:mm:ss (24h) ---
+function formatDate(dateString) {
+    if (!dateString) return '';
+    const d = new Date(dateString);
+
+    const day = String(d.getDate()).padStart(2, '0');
+    const month = String(d.getMonth() + 1).padStart(2, '0');
+    const year = d.getFullYear();
+
+    const hours = String(d.getHours()).padStart(2, '0');
+    const minutes = String(d.getMinutes()).padStart(2, '0');
+    const seconds = String(d.getSeconds()).padStart(2, '0');
+
+    return `${day}.${month}.${year} ${hours}:${minutes}:${seconds}`;
 }
 
 // --- Auth ---
@@ -104,7 +131,7 @@ async function login() {
             body: JSON.stringify({ username, password })
         });
 
-        if (!res.ok) throw new Error('Invalid login or password');
+        if (!res.ok) throw new Error('Invalid username or password');
 
         const data = await res.json();
         token = data.access_token;
@@ -155,29 +182,28 @@ async function loadVacancies(type, tabEl) {
 }
 
 function renderFilteredTable(items) {
-    if (!items.length) return '<div class="loading">No vacancies</div>';
+    if (!items.length) return '<div class="loading">No vacancies found</div>';
     return `<table>
-        <tr><th>Company</th><th>Position</th><th>Decision</th><th>Confidence</th><th>Reason</th><th>Url</th></tr>
+        <tr><th>Company</th><th>Position</th><th>Confidence</th><th>Processed At</th><th>Link</th></tr>
         ${items.map(v => `<tr>
             <td><strong>${esc(v.company)}</strong></td>
             <td>${esc(v.title)}</td>
-            <td><span class="badge ${esc(v.decision)}">${esc(v.decision)}</span></td>
             <td>${Math.round(v.confidence * 100)}%</td>
-            <td>${esc(v.reason)}</td>
+            <td>${formatDate(v.processed_at)}</td>
             <td><a href="${safeUrl(v.url)}" target="_blank" rel="noopener noreferrer">Open ↗</a></td>
         </tr>`).join('')}
     </table>`;
 }
 
 function renderRawTable(items) {
-    if (!items.length) return '<div class="loading">No vacancies</div>';
+    if (!items.length) return '<div class="loading">No vacancies found</div>';
     return `<table>
-        <tr><th>Company</th><th>Position</th><th>Source</th><th>Data</th><th>Url</th></tr>
+        <tr><th>Company</th><th>Position</th><th>Source</th><th>Fetched At</th><th>Link</th></tr>
         ${items.map(v => `<tr>
             <td><strong>${esc(v.company)}</strong></td>
             <td>${esc(v.title)}</td>
             <td>${esc(v.source)}</td>
-            <td>${new Date(v.fetched_at).toLocaleDateString('ru-RU')}</td>
+            <td>${formatDate(v.fetched_at)}</td>
             <td><a href="${safeUrl(v.url)}" target="_blank" rel="noopener noreferrer">Open ↗</a></td>
         </tr>`).join('')}
     </table>`;
