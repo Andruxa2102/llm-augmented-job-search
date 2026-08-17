@@ -122,7 +122,7 @@ class SourceXAdapter(JobSource):
             "hhtmFromLabel": "chip_filter",
             "hhtmFrom": "vacancy_search_list",
             "text": self.cfg.query,
-            "search_field": ["name", "company_name", "description"],  # ← Список → 3 отдельных параметра в URL
+            "search_field": ["name", "company_name", "description"],
             "enable_snippets": "true",
             "hhtmSource": "vacancy_search_list",
             "hhtmSourceLabel": "vacancy_search_list",
